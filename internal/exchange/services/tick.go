@@ -16,6 +16,7 @@ import (
 const (
 	timeIdx = 3
 	lastIdx = 4
+	volIdx  = 5
 )
 
 // Service for working with ticks.
@@ -46,6 +47,8 @@ func (t *tickService) StartReading(ctx context.Context, ticker string, out chan 
 // Starts reading ticks from a file and sending it to channel.
 func (t *tickService) start(ctx context.Context, ticker string, scanner *bufio.Scanner, out chan exchange.Tick) {
 	timeTicker := time.NewTicker(time.Second)
+	defer timeTicker.Stop()
+
 	now := time.Now().Format("150405")
 
 	var (
@@ -109,7 +112,12 @@ func (t *tickService) processTick(data []string, ticker string, out chan exchang
 		return err
 	}
 
-	out <- exchange.Tick{Ticker: ticker, Price: price}
+	vol, err := strconv.ParseInt(data[volIdx], 10, 32)
+	if err != nil {
+		return err
+	}
+
+	out <- exchange.Tick{Ticker: ticker, Price: price, Vol: int32(vol)}
 
 	return nil
 }

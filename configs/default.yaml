@@ -1,6 +1,7 @@
 tickers:
   - SPFB.RTS
   - SPFB.Si
+interval: 1s
 db:
   host: 127.0.0.1
   user: app

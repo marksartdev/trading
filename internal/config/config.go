@@ -6,14 +6,16 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 // Config main config.
 type Config struct {
-	Tickers []string `yaml:"tickers"`
-	DB      DB       `yaml:"db"`
+	Tickers  []string      `yaml:"tickers"`
+	Interval time.Duration `yaml:"interval"`
+	DB       DB            `yaml:"db"`
 }
 
 // DB Postgres config.

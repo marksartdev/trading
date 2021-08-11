@@ -6,6 +6,7 @@ import "context"
 type Tick struct {
 	Ticker string
 	Price  float64
+	Vol    int32
 }
 
 // TickService service for working with ticks.

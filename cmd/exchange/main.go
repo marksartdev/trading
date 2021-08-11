@@ -3,16 +3,19 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/grpc"
 
 	"github.com/marksartdev/trading/internal/config"
-	"github.com/marksartdev/trading/internal/exchange"
+	"github.com/marksartdev/trading/internal/exchange/delivery/rpc"
 	"github.com/marksartdev/trading/internal/exchange/repository/memory"
 	"github.com/marksartdev/trading/internal/exchange/services"
 )
@@ -38,10 +41,20 @@ func main() {
 
 	dealQueue := memory.NewDealQueue()
 	tickService := services.NewTickService(sugar)
-	exchangeService := services.NewExchangeService(sugar, dealQueue, tickService, cfg.Tickers)
 
-	// todo remove it.
-	broker := make(chan exchange.Deal, 10)
+	exchangeService := services.NewExchangeService(sugar, dealQueue, tickService, cfg.Tickers, cfg.Interval)
+	exchangeServer := rpc.NewExchangeServer(sugar, exchangeService)
+
+	lis, err := net.Listen("tcp", ":8000")
+	if err != nil {
+		sugar.Fatal(err)
+	}
+
+	srv := grpc.NewServer(
+		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(grpc_zap.StreamServerInterceptor(logger))),
+		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(grpc_zap.UnaryServerInterceptor(logger))),
+	)
+	rpc.RegisterExchangeServer(srv, exchangeServer)
 
 	go func() {
 		done := make(chan os.Signal, 1)
@@ -50,28 +63,12 @@ func main() {
 		<-done
 		fmt.Println()
 		exchangeService.Stop()
-		close(broker) // todo remove it.
+		srv.Stop()
 	}()
-
-	// todo remove it.
-	deal := exchangeService.Create(exchange.Deal{
-		BrokerID: 2,
-		ClientID: 1,
-		Ticker:   "SPFB.Si",
-		Amount:   10,
-		Partial:  false,
-		Time:     time.Now(),
-		Price:    -1000,
-	})
-	sugar.Info(deal)
-
-	// todo remove it.
-	exchangeService.Results(2, broker)
 
 	go exchangeService.Start()
 
-	// todo remove it.
-	for deal := range broker {
-		fmt.Println(deal)
+	if err := srv.Serve(lis); err != nil {
+		sugar.Fatal(err)
 	}
 }

@@ -11,6 +11,7 @@ type OHLCV struct {
 	High     float64
 	Low      float64
 	Close    float64
+	Volume   int32
 	Ticker   string
 }
 
@@ -32,6 +33,6 @@ type ExchangeService interface {
 	Stop()
 	Statistic(brokerID int32, ch chan OHLCV)
 	Create(deal Deal) Deal
-	Cancel(dealID int64)
+	Cancel(dealID int64) bool
 	Results(brokerID int32, ch chan Deal)
 }

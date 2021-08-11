@@ -51,7 +51,7 @@ func (d *dealQueue) Get(ticker string, price float64) []exchange.Deal {
 }
 
 // Delete removes deal from queue.
-func (d *dealQueue) Delete(dealID int64) {
+func (d *dealQueue) Delete(dealID int64) bool {
 	idx := -1
 
 	d.mu.Lock()
@@ -65,8 +65,10 @@ func (d *dealQueue) Delete(dealID int64) {
 	}
 
 	if idx == -1 {
-		return
+		return false
 	}
 
 	d.deals = append(d.deals[:idx], d.deals[idx+1:]...)
+
+	return true
 }
