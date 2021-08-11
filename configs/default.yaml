@@ -1,0 +1,9 @@
+tickers:
+  - SPFB.RTS
+  - SPFB.Si
+db:
+  host: 127.0.0.1
+  user: app
+  password: test
+  db_name: exchanger
+  time_zone: Europe/Moscow

@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:buster
+    environment:
+      POSTGRES_DB: exchanger
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: test
+    volumes:
+      - "../tmp/postgres:/var/lib/postgresql/data"
+    ports:
+      - "5432:5432"
+    networks:
+      - trading
+    restart: always
+  adminer:
+    container_name: adminer
+    image: adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: dracula
+    ports:
+      - "80:8080"
+    networks:
+      - trading
+    depends_on:
+      - postgres
+    restart: always
+
+networks:
+  trading:
+    external: false
