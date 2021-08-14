@@ -1,10 +1,13 @@
-tickers:
-  - SPFB.RTS
-  - SPFB.Si
-interval: 1s
-db:
-  host: 127.0.0.1
-  user: app
-  password: test
-  db_name: exchanger
-  time_zone: Europe/Moscow
+exchange:
+  tickers:
+    - SPFB.RTS
+    - SPFB.Si
+  interval: 1s
+broker:
+  db:
+    host: 127.0.0.1
+    port: 5432
+    user: app
+    password: test
+    db_name: broker
+    time_zone: Europe/Moscow

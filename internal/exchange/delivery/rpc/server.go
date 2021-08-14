@@ -5,22 +5,26 @@ import (
 	"fmt"
 	"time"
 
-	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/marksartdev/trading/internal/exchange"
+	"github.com/marksartdev/trading/internal/log"
 )
 
 const errLimit = 10
 
+const gRPC log.Action = "gRPC"
+
 // gRPC server.
 type exchangeServer struct {
-	logger  *zap.SugaredLogger
+	logger  log.Logger
 	service exchange.ExchangeService
 	UnimplementedExchangeServer
 }
 
 // NewExchangeServer creates new gRPC server.
-func NewExchangeServer(logger *zap.SugaredLogger, service exchange.ExchangeService) ExchangeServer {
+func NewExchangeServer(logger log.Logger, service exchange.ExchangeService) ExchangeServer {
 	return &exchangeServer{logger: logger, service: service}
 }
 
@@ -28,28 +32,39 @@ func NewExchangeServer(logger *zap.SugaredLogger, service exchange.ExchangeServi
 func (e exchangeServer) Statistic(brokerID *BrokerID, stream Exchange_StatisticServer) error {
 	var errCount int
 
-	e.logger.Info(e.wrapMsg(fmt.Sprintf("start streaming statistic for brocker %d", brokerID.GetID())))
-	defer e.logger.Info(e.wrapMsg(fmt.Sprintf("stop streaming statistic for brocker %d", brokerID.GetID())))
+	broker := exchange.Broker{
+		ID:         brokerID.GetID(),
+		InstanceID: time.Now().UnixNano(),
+	}
+
+	e.logger.Info(gRPC, fmt.Sprintf("start streaming statistic for brocker %d", brokerID.GetID()))
+	defer e.logger.Info(gRPC, fmt.Sprintf("stop streaming statistic for brocker %d", brokerID.GetID()))
+	defer e.service.StatisticUnsubscribe(broker)
 
 	ch := make(chan exchange.OHLCV, 100)
-	e.service.Statistic(brokerID.GetID(), ch)
+	e.service.Statistic(broker, ch)
 
 	for st := range ch {
 		ohlcv := OHLCV{
 			ID:       st.ID,
-			Time:     int32(st.Time.Unix()),
+			Time:     st.Time.Unix(),
 			Interval: int32(st.Interval.Seconds()),
-			Open:     float32(st.Open),
-			High:     float32(st.High),
-			Low:      float32(st.Low),
-			Close:    float32(st.Close),
+			Open:     st.Open,
+			High:     st.High,
+			Low:      st.Low,
+			Close:    st.Close,
 			Volume:   st.Volume,
 			Ticker:   st.Ticker,
 		}
 
 		err := stream.Send(&ohlcv)
 		if err != nil {
-			e.logger.Error(e.wrapErr(err))
+			if s, ok := status.FromError(err); ok {
+				if s.Code() == codes.Unavailable {
+					return nil
+				}
+			}
+			e.logger.Error(gRPC, err)
 
 			errCount++
 			if errCount > errLimit {
@@ -70,11 +85,13 @@ func (e exchangeServer) Create(_ context.Context, deal *Deal) (*DealID, error) {
 		Ticker:   deal.GetTicker(),
 		Amount:   deal.GetAmount(),
 		Partial:  deal.GetPartial(),
-		Time:     time.Unix(int64(deal.GetTime()), 0),
-		Price:    float64(deal.GetPrice()),
+		Time:     time.Unix(deal.GetTime(), 0),
+		Price:    deal.GetPrice(),
 	}
 
 	d = e.service.Create(d)
+
+	e.logger.Info(gRPC, fmt.Sprintf("%q request from broker %d wath handled", "Create", deal.GetBrokerID()))
 
 	return &DealID{ID: d.ID, BrokerID: d.BrokerID}, nil
 }
@@ -83,6 +100,8 @@ func (e exchangeServer) Create(_ context.Context, deal *Deal) (*DealID, error) {
 func (e exchangeServer) Cancel(_ context.Context, dealID *DealID) (*CancelResult, error) {
 	ok := e.service.Cancel(dealID.GetID())
 
+	e.logger.Info(gRPC, fmt.Sprintf("%q request from broker %d wath handled", "Cancel", dealID.GetBrokerID()))
+
 	return &CancelResult{Success: ok}, nil
 }
 
@@ -90,11 +109,17 @@ func (e exchangeServer) Cancel(_ context.Context, dealID *DealID) (*CancelResult
 func (e exchangeServer) Results(brokerID *BrokerID, stream Exchange_ResultsServer) error {
 	var errCount int
 
-	e.logger.Info(e.wrapMsg(fmt.Sprintf("start streaming results for brocker %d", brokerID.GetID())))
-	defer e.logger.Info(e.wrapMsg(fmt.Sprintf("stop streaming results for brocker %d", brokerID.GetID())))
+	broker := exchange.Broker{
+		ID:         brokerID.GetID(),
+		InstanceID: time.Now().UnixNano(),
+	}
+
+	e.logger.Info(gRPC, fmt.Sprintf("start streaming results for brocker %d", brokerID.GetID()))
+	defer e.logger.Info(gRPC, fmt.Sprintf("stop streaming results for brocker %d", brokerID.GetID()))
+	defer e.service.ResultsUnsubscribe(broker)
 
 	ch := make(chan exchange.Deal, 100)
-	e.service.Results(brokerID.GetID(), ch)
+	e.service.Results(broker, ch)
 
 	for r := range ch {
 		res := Deal{
@@ -104,13 +129,18 @@ func (e exchangeServer) Results(brokerID *BrokerID, stream Exchange_ResultsServe
 			Ticker:   r.Ticker,
 			Amount:   r.Amount,
 			Partial:  r.Partial,
-			Time:     int32(r.Time.Unix()),
-			Price:    float32(r.Price),
+			Time:     r.Time.Unix(),
+			Price:    r.Price,
 		}
 
 		err := stream.Send(&res)
 		if err != nil {
-			e.logger.Error(e.wrapErr(err))
+			if s, ok := status.FromError(err); ok {
+				if s.Code() == codes.Unavailable {
+					return nil
+				}
+			}
+			e.logger.Error(gRPC, err)
 
 			errCount++
 			if errCount > errLimit {
@@ -120,12 +150,4 @@ func (e exchangeServer) Results(brokerID *BrokerID, stream Exchange_ResultsServe
 	}
 
 	return nil
-}
-
-func (e exchangeServer) wrapErr(err error) string {
-	return e.wrapMsg(err.Error())
-}
-
-func (e exchangeServer) wrapMsg(msg string) string {
-	return fmt.Sprintf("\033[0;32mgRPC [exchanger]\033[0m %s", msg)
 }

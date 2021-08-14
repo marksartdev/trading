@@ -18,8 +18,8 @@ type OHLCV struct {
 // Deal purchase/sale of ticker.
 type Deal struct {
 	ID       int64
-	BrokerID int32
-	ClientID int32
+	BrokerID int64
+	ClientID int64
 	Ticker   string
 	Amount   int32
 	Partial  bool
@@ -31,8 +31,10 @@ type Deal struct {
 type ExchangeService interface {
 	Start()
 	Stop()
-	Statistic(brokerID int32, ch chan OHLCV)
+	Statistic(broker Broker, ch chan OHLCV)
+	StatisticUnsubscribe(broker Broker)
 	Create(deal Deal) Deal
 	Cancel(dealID int64) bool
-	Results(brokerID int32, ch chan Deal)
+	Results(broker Broker, ch chan Deal)
+	ResultsUnsubscribe(broker Broker)
 }

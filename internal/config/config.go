@@ -13,14 +13,25 @@ import (
 
 // Config main config.
 type Config struct {
+	Exchange Exchange `yaml:"exchange"`
+	Broker   Broker   `yaml:"broker"`
+}
+
+// Exchange stock exchange service config.
+type Exchange struct {
 	Tickers  []string      `yaml:"tickers"`
 	Interval time.Duration `yaml:"interval"`
-	DB       DB            `yaml:"db"`
+}
+
+// Broker broker config.
+type Broker struct {
+	DB DB `yaml:"db"`
 }
 
 // DB Postgres config.
 type DB struct {
 	Host     string `yaml:"host"`
+	Port     int32  `yaml:"port"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
 	DBName   string `yaml:"db_name"`

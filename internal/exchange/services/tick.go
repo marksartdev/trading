@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/marksartdev/trading/internal/exchange"
+	"github.com/marksartdev/trading/internal/log"
 )
 
 const (
@@ -21,11 +22,11 @@ const (
 
 // Service for working with ticks.
 type tickService struct {
-	logger exchange.Logger
+	logger log.Logger
 }
 
 // NewTickService creates new tick service.
-func NewTickService(logger exchange.Logger) exchange.TickService {
+func NewTickService(logger log.Logger) exchange.TickService {
 	return &tickService{logger: logger}
 }
 
@@ -33,7 +34,7 @@ func NewTickService(logger exchange.Logger) exchange.TickService {
 func (t *tickService) StartReading(ctx context.Context, ticker string, out chan exchange.Tick) {
 	f, err := os.Open(filepath.Join("assets", fmt.Sprintf("%s.txt", ticker)))
 	if err != nil {
-		t.logger.Error(t.wrapMsg(ticker, err.Error()))
+		t.logger.Error(mainAction, err)
 		return
 	}
 	defer func() {
@@ -56,7 +57,8 @@ func (t *tickService) start(ctx context.Context, ticker string, scanner *bufio.S
 		data   []string
 	)
 
-	t.logger.Info(t.wrapMsg(ticker, "started"))
+	t.logger.Info(log.Action(ticker), "started")
+	defer t.logger.Info(log.Action(ticker), "stopped")
 
 	// Skip headers.
 	if scanner.Scan() {
@@ -78,12 +80,11 @@ func (t *tickService) start(ctx context.Context, ticker string, scanner *bufio.S
 
 		select {
 		case <-ctx.Done():
-			t.logger.Info(t.wrapMsg(ticker, "stopped"))
 			return
 		case <-timeTicker.C:
 			firstTickTime := strings.TrimSpace(data[timeIdx])
 			if err := t.processTick(data, ticker, out); err != nil {
-				t.logger.Error(t.wrapMsg(ticker, err.Error()))
+				t.logger.Error(log.Action(ticker), err)
 				continue
 			}
 
@@ -97,7 +98,7 @@ func (t *tickService) start(ctx context.Context, ticker string, scanner *bufio.S
 				}
 
 				if err := t.processTick(data, ticker, out); err != nil {
-					t.logger.Error(t.wrapMsg(ticker, err.Error()))
+					t.logger.Error(log.Action(ticker), err)
 					continue
 				}
 			}

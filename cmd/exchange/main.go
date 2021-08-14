@@ -2,59 +2,42 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
-	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
-	"github.com/marksartdev/trading/internal/config"
+	"github.com/marksartdev/trading/internal/app"
 	"github.com/marksartdev/trading/internal/exchange/delivery/rpc"
 	"github.com/marksartdev/trading/internal/exchange/repository/memory"
 	"github.com/marksartdev/trading/internal/exchange/services"
+	"github.com/marksartdev/trading/internal/log"
 )
 
+const http log.Action = "http"
+
 func main() {
-	loggerConf := zap.NewDevelopmentConfig()
-	loggerConf.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	loggerConf.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("02.01.2006 15:04:05.000")
-	loggerConf.DisableCaller = true
-	loggerConf.DisableStacktrace = true
-
-	logger, err := loggerConf.Build()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	sugar := logger.Sugar()
-
-	cfg, err := config.Load("default")
-	if err != nil {
-		sugar.Fatal(err)
-	}
+	logger, cfg := app.Init()
 
 	dealQueue := memory.NewDealQueue()
-	tickService := services.NewTickService(sugar)
+	tickLogger := log.NewLogger(logger, "Ticker", log.Blue())
+	ticks := services.NewTickService(tickLogger)
 
-	exchangeService := services.NewExchangeService(sugar, dealQueue, tickService, cfg.Tickers, cfg.Interval)
-	exchangeServer := rpc.NewExchangeServer(sugar, exchangeService)
+	exchangeLogger := log.NewLogger(logger, "Exchanger", log.Purple())
+	service := services.NewExchangeService(exchangeLogger, dealQueue, ticks, cfg.Exchange.Tickers, cfg.Exchange.Interval)
+
+	srvLogger := log.NewLogger(logger, "Server", log.Green())
+	grpcServer := rpc.NewExchangeServer(srvLogger, service)
 
 	lis, err := net.Listen("tcp", ":8000")
 	if err != nil {
-		sugar.Fatal(err)
+		logger.Fatal(err)
 	}
 
-	srv := grpc.NewServer(
-		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(grpc_zap.StreamServerInterceptor(logger))),
-		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(grpc_zap.UnaryServerInterceptor(logger))),
-	)
-	rpc.RegisterExchangeServer(srv, exchangeServer)
+	srv := grpc.NewServer()
+	rpc.RegisterExchangeServer(srv, grpcServer)
 
 	go func() {
 		done := make(chan os.Signal, 1)
@@ -62,13 +45,17 @@ func main() {
 
 		<-done
 		fmt.Println()
-		exchangeService.Stop()
+		service.Stop()
+	}()
+
+	go func() {
+		service.Start()
 		srv.Stop()
 	}()
 
-	go exchangeService.Start()
-
+	srvLogger.Info(http, "started")
 	if err := srv.Serve(lis); err != nil {
-		sugar.Fatal(err)
+		logger.Fatal(err)
 	}
+	srvLogger.Info(http, "stopped")
 }

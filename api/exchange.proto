@@ -4,34 +4,34 @@ option go_package = "github.com/marksartdev/trading/internal/exchange/delivery/r
 
 message OHLCV {
   int64 ID = 1;
-  int32 Time = 2;
+  int64 Time = 2;
   int32 Interval = 3;
-  float Open = 4;
-  float High = 5;
-  float Low = 6;
-  float Close = 7;
+  double Open = 4;
+  double High = 5;
+  double Low = 6;
+  double Close = 7;
   int32 Volume = 8;
   string Ticker = 9;
 }
 
 message Deal {
   int64 ID = 1;
-  int32 BrokerID = 2;
-  int32 ClientID = 3;
+  int64 BrokerID = 2;
+  int64 ClientID = 3;
   string Ticker = 4;
   int32 Amount = 5;
   bool Partial = 6;
-  int32 Time = 7;
-  float Price = 8;
+  int64 Time = 7;
+  double Price = 8;
 }
 
 message DealID {
   int64 ID = 1;
-  int32 BrokerID = 2;
+  int64 BrokerID = 2;
 }
 
 message BrokerID {
-  int32 ID = 1;
+  int64 ID = 1;
 }
 
 message CancelResult {

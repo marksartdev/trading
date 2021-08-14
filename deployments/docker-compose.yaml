@@ -5,7 +5,7 @@ services:
     container_name: postgres
     image: postgres:buster
     environment:
-      POSTGRES_DB: exchanger
+      POSTGRES_DB: broker
       POSTGRES_USER: app
       POSTGRES_PASSWORD: test
     volumes:

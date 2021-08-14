@@ -9,6 +9,16 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/marksartdev/trading/internal/exchange"
+	"github.com/marksartdev/trading/internal/log"
+)
+
+const baseAmount = 1000
+
+const (
+	mainAction       log.Action = "main"
+	retransmitAction log.Action = "retransmit"
+	statAction       log.Action = "statistic"
+	dealsAction      log.Action = "deals"
 )
 
 // DealQueue queue of deals.
@@ -20,36 +30,41 @@ type DealQueue interface {
 
 // Service for exchanging.
 type exchangeService struct {
-	mu          *sync.Mutex
-	logger      exchange.Logger
+	mu          *sync.RWMutex
+	logger      log.Logger
 	dealQueue   DealQueue
 	tickService exchange.TickService
 	tickers     []string
 	interval    time.Duration
 	tickerAmt   map[string]int32
-	statObs     map[int32]chan exchange.OHLCV
-	dealsObs    map[int32]chan exchange.Deal
+	statObs     map[exchange.Broker]chan exchange.OHLCV
+	dealsObs    map[exchange.Broker]chan exchange.Deal
 	cancel      context.CancelFunc
 }
 
 // NewExchangeService creates new exchange service.
 func NewExchangeService(
-	logger exchange.Logger,
+	logger log.Logger,
 	dealQueue DealQueue,
 	tickService exchange.TickService,
 	tickers []string,
 	interval time.Duration,
 ) exchange.ExchangeService {
+	tickerAmn := make(map[string]int32)
+	for _, ticker := range tickers {
+		tickerAmn[ticker] = baseAmount
+	}
+
 	return &exchangeService{
-		mu:          &sync.Mutex{},
+		mu:          &sync.RWMutex{},
 		logger:      logger,
 		dealQueue:   dealQueue,
 		tickService: tickService,
 		tickers:     tickers,
 		interval:    interval,
-		tickerAmt:   make(map[string]int32),
-		statObs:     make(map[int32]chan exchange.OHLCV),
-		dealsObs:    make(map[int32]chan exchange.Deal),
+		tickerAmt:   tickerAmn,
+		statObs:     make(map[exchange.Broker]chan exchange.OHLCV),
+		dealsObs:    make(map[exchange.Broker]chan exchange.Deal),
 	}
 }
 
@@ -89,13 +104,13 @@ func (e *exchangeService) Start() {
 		})
 	}
 
-	e.logger.Info(e.wrapMsg("main", "started"))
+	e.logger.Info(mainAction, "started")
 
 	if err := g.Wait(); err != nil {
-		e.logger.Info(e.wrapMsg("main", err.Error()))
+		e.logger.Error(mainAction, err)
 	}
 
-	e.logger.Info(e.wrapMsg("main", "stopped"))
+	e.logger.Info(mainAction, "stopped")
 }
 
 // Stop stops working.
@@ -105,12 +120,21 @@ func (e *exchangeService) Stop() {
 		return
 	}
 
-	e.logger.Error(e.wrapMsg("main", "cancel func dose not initialized"))
+	e.logger.Error(mainAction, fmt.Errorf("cancel func dose not initialized"))
 }
 
-// Statistic adds observer for a statistic.
-func (e *exchangeService) Statistic(brokerID int32, ch chan exchange.OHLCV) {
-	e.statObs[brokerID] = ch
+// Statistic adds observer for statistic.
+func (e *exchangeService) Statistic(broker exchange.Broker, ch chan exchange.OHLCV) {
+	e.mu.Lock()
+	e.statObs[broker] = ch
+	e.mu.Unlock()
+}
+
+// StatisticUnsubscribe removes observer for statistic.
+func (e *exchangeService) StatisticUnsubscribe(broker exchange.Broker) {
+	e.mu.Lock()
+	delete(e.statObs, broker)
+	e.mu.Unlock()
 }
 
 // Create adds a deal to queue.
@@ -127,12 +151,24 @@ func (e *exchangeService) Cancel(dealID int64) bool {
 }
 
 // Results adds observer for deals.
-func (e *exchangeService) Results(brokerID int32, ch chan exchange.Deal) {
-	e.dealsObs[brokerID] = ch
+func (e *exchangeService) Results(broker exchange.Broker, ch chan exchange.Deal) {
+	e.mu.Lock()
+	e.dealsObs[broker] = ch
+	e.mu.Unlock()
+}
+
+// ResultsUnsubscribe removes observer for deals.
+func (e *exchangeService) ResultsUnsubscribe(broker exchange.Broker) {
+	e.mu.Lock()
+	delete(e.dealsObs, broker)
+	e.mu.Unlock()
 }
 
 // Retransmits ticks to other channels.
 func (e *exchangeService) retransmitTick(ctx context.Context, in chan exchange.Tick, out ...chan exchange.Tick) {
+	e.logger.Info(retransmitAction, "started")
+	defer e.logger.Info(retransmitAction, "stopped")
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -154,6 +190,9 @@ func (e *exchangeService) sendStatistic(ctx context.Context, in chan exchange.Ti
 
 	t := time.NewTicker(e.interval)
 	defer t.Stop()
+
+	e.logger.Info(statAction, "started")
+	defer e.logger.Info(statAction, "stopped")
 
 	for {
 		select {
@@ -189,8 +228,16 @@ func (e *exchangeService) sendStatistic(ctx context.Context, in chan exchange.Ti
 
 			ohlcv.Close = closePrice
 
+			var observers []chan exchange.OHLCV
+
+			e.mu.RLock()
 			for _, ch := range e.statObs {
-				ch <- ohlcv
+				observers = append(observers, ch)
+			}
+			e.mu.RUnlock()
+
+			for _, obs := range observers {
+				obs <- ohlcv
 			}
 
 			ohlcv = exchange.OHLCV{}
@@ -200,12 +247,12 @@ func (e *exchangeService) sendStatistic(ctx context.Context, in chan exchange.Ti
 
 // Completes deals.
 func (e *exchangeService) completeDeals(ctx context.Context, in chan exchange.Tick) {
-	e.logger.Info(e.wrapMsg("deals", "started"))
+	e.logger.Info(dealsAction, "started")
+	defer e.logger.Info(dealsAction, "stopped")
 
 	for {
 		select {
 		case <-ctx.Done():
-			e.logger.Info(e.wrapMsg("deals", "stopped"))
 			return
 		case tick := <-in:
 			deals := e.dealQueue.Get(tick.Ticker, tick.Price)
@@ -225,7 +272,19 @@ func (e *exchangeService) completeDeals(ctx context.Context, in chan exchange.Ti
 				e.mu.Unlock()
 
 				if completed {
-					e.dealsObs[deal.BrokerID] <- deal
+					var observers []chan exchange.Deal
+
+					e.mu.RLock()
+					for broker, ch := range e.dealsObs {
+						if broker.ID == deal.BrokerID {
+							observers = append(observers, ch)
+						}
+					}
+					e.mu.RUnlock()
+
+					for _, obs := range observers {
+						obs <- deal
+					}
 				}
 			}
 		}
