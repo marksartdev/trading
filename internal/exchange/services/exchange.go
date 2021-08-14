@@ -261,12 +261,12 @@ func (e *exchangeService) completeDeals(ctx context.Context, in chan exchange.Ti
 
 				e.mu.Lock()
 				if deal.Price > 0 && e.tickerAmt[deal.Ticker] > 0 {
-					e.completePurchase(&deal)
+					e.completePurchase(&deal, tick.Price)
 					completed = true
 				}
 
 				if deal.Price < 0 {
-					e.completeSale(&deal)
+					e.completeSale(&deal, tick.Price)
 					completed = true
 				}
 				e.mu.Unlock()
@@ -292,7 +292,7 @@ func (e *exchangeService) completeDeals(ctx context.Context, in chan exchange.Ti
 }
 
 // Completes purchase.
-func (e *exchangeService) completePurchase(deal *exchange.Deal) {
+func (e *exchangeService) completePurchase(deal *exchange.Deal, price float64) {
 	if e.tickerAmt[deal.Ticker] < deal.Amount {
 		deal.Amount = e.tickerAmt[deal.Ticker]
 		deal.Partial = true
@@ -301,12 +301,14 @@ func (e *exchangeService) completePurchase(deal *exchange.Deal) {
 		e.tickerAmt[deal.Ticker] -= deal.Amount
 	}
 
+	deal.Price = price
 	e.dealQueue.Delete(deal.ID)
 }
 
 // Completes sale.
-func (e *exchangeService) completeSale(deal *exchange.Deal) {
+func (e *exchangeService) completeSale(deal *exchange.Deal, price float64) {
 	e.tickerAmt[deal.Ticker] += deal.Amount
+	deal.Price = -price
 	e.dealQueue.Delete(deal.ID)
 }
 

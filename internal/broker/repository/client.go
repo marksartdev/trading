@@ -29,29 +29,38 @@ func NewClientRepo(db *gorm.DB) broker.ClientRepo {
 }
 
 // Add adds client ot repository.
-func (c clientRepo) Add(client broker.Client) error {
+func (c clientRepo) Add(client *broker.Client) error {
 	entity := Client{
 		Login:   client.Login,
 		Balance: client.Balance,
 	}
 
-	return c.db.Create(&entity).Error
+	if err := c.db.Create(&entity).Error; err != nil {
+		return err
+	}
+
+	client.ID = entity.ID
+	return nil
 }
 
 // Get returns client from repository.
-func (c clientRepo) Get(clientID int64) (broker.Client, error) {
+func (c clientRepo) Get(login string) (broker.Client, bool, error) {
 	var entity Client
 
-	err := c.db.Where(Client{ID: clientID}).First(&entity).Error
+	err := c.db.Where(Client{Login: login}).First(&entity).Error
 	if err != nil {
-		return broker.Client{}, err
+		if err == gorm.ErrRecordNotFound {
+			return broker.Client{}, false, nil
+		}
+
+		return broker.Client{}, false, err
 	}
 
 	return broker.Client{
-		ClientID: entity.ID,
-		Login:    entity.Login,
-		Balance:  entity.Balance,
-	}, nil
+		ID:      entity.ID,
+		Login:   entity.Login,
+		Balance: entity.Balance,
+	}, true, nil
 }
 
 // SumBalance adds new sum to client balance.

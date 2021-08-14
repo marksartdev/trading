@@ -3,7 +3,9 @@ module github.com/marksartdev/trading
 go 1.16
 
 require (
-	github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4
+	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
+	github.com/imdario/mergo v0.3.12
+	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 	go.uber.org/zap v1.19.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/grpc v1.39.1

@@ -48,7 +48,7 @@ func (e exchangeServer) Statistic(brokerID *BrokerID, stream Exchange_StatisticS
 		ohlcv := OHLCV{
 			ID:       st.ID,
 			Time:     st.Time.Unix(),
-			Interval: int32(st.Interval.Seconds()),
+			Interval: int32(st.Interval.Nanoseconds()),
 			Open:     st.Open,
 			High:     st.High,
 			Low:      st.Low,

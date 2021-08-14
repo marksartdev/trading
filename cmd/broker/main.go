@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,7 +10,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/marksartdev/trading/internal/app"
-	"github.com/marksartdev/trading/internal/broker"
 	"github.com/marksartdev/trading/internal/broker/database"
 	brokerRpc "github.com/marksartdev/trading/internal/broker/delivery/rpc"
 	"github.com/marksartdev/trading/internal/broker/repository"
@@ -49,16 +49,17 @@ func main() {
 	serviceLogger := log.NewLogger(logger, "Broker", log.Blue())
 
 	service := services.NewBrokerService(serviceLogger, clientRepo, dealRepo, posRepo, statRepo, exchangeService)
-	_, err = service.Create(broker.Deal{
-		ClientID: 1,
-		Ticker:   "SPFB.RTS",
-		Type:     broker.Sell,
-		Amount:   400,
-		Price:    1000,
-	})
+
+	srvLogger := log.NewLogger(logger, "Server", log.Green())
+	grpcServer := brokerRpc.NewBrokerServer(srvLogger, service)
+
+	lis, err := net.Listen("tcp", ":8001")
 	if err != nil {
 		logger.Fatal(err)
 	}
+
+	srv := grpc.NewServer()
+	brokerRpc.RegisterBrokerServer(srv, grpcServer)
 
 	go func() {
 		done := make(chan os.Signal, 1)
@@ -69,9 +70,14 @@ func main() {
 		service.Stop()
 	}()
 
-	srvLogger := log.NewLogger(logger, "Server", log.Green())
+	go func() {
+		service.Start()
+		srv.Stop()
+	}()
 
 	srvLogger.Info(http, "started")
-	service.Start()
+	if err := srv.Serve(lis); err != nil {
+		logger.Fatal(err)
+	}
 	srvLogger.Info(http, "stopped")
 }

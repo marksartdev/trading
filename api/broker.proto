@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package broker;
+option go_package = "github.com/marksartdev/trading/internal/broker/delivery/rpc";
+
+message Client {
+  string Login = 1;
+}
+
+message Profile {
+  double Balance = 1;
+  repeated Position Positions = 2;
+  repeated Deal Deals = 3;
+}
+
+message Position {
+  string Ticker = 1;
+  int32 Amount = 2;
+}
+
+message Deal {
+  int64 ID = 1;
+  string Ticker = 2;
+  string Type = 3;
+  int32 Amount = 4;
+  double Price = 5;
+  int64 Time = 6;
+}
+
+message CreateDeal {
+  Client Client = 1;
+  string Ticker = 2;
+  string Type = 3;
+  int32 Amount = 4;
+  double Price = 5;
+}
+
+message CancelDeal {
+  Client Client = 1;
+  DealID DealID = 2;
+}
+
+message DealID {
+  int64 ID = 1;
+}
+
+message Success {
+  bool OK = 1;
+}
+
+message Ticker {
+  Client Client = 1;
+  string Name = 2;
+}
+
+message OHLCV {
+  repeated Price Prices = 1;
+}
+
+message Price {
+  int64 Time = 1;
+  int32 Interval = 2;
+  double Open = 3;
+  double High = 4;
+  double Low = 5;
+  double Close = 6;
+  int32 Vol = 7;
+}
+
+service Broker {
+  rpc GetProfile (Client) returns (Profile) {}
+  rpc Create (CreateDeal) returns (DealID) {}
+  rpc Cancel (CancelDeal) returns (Success) {}
+  rpc Statistic (Ticker) returns (OHLCV) {}
+}

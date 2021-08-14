@@ -33,7 +33,7 @@ func NewExchangeClient(cc grpc.ClientConnInterface) ExchangeClient {
 }
 
 func (c *exchangeClient) Statistic(ctx context.Context, in *BrokerID, opts ...grpc.CallOption) (Exchange_StatisticClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Exchange_ServiceDesc.Streams[0], "/Exchange/Statistic", opts...)
+	stream, err := c.cc.NewStream(ctx, &Exchange_ServiceDesc.Streams[0], "/exchange.Exchange/Statistic", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (x *exchangeStatisticClient) Recv() (*OHLCV, error) {
 
 func (c *exchangeClient) Create(ctx context.Context, in *Deal, opts ...grpc.CallOption) (*DealID, error) {
 	out := new(DealID)
-	err := c.cc.Invoke(ctx, "/Exchange/Create", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/exchange.Exchange/Create", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (c *exchangeClient) Create(ctx context.Context, in *Deal, opts ...grpc.Call
 
 func (c *exchangeClient) Cancel(ctx context.Context, in *DealID, opts ...grpc.CallOption) (*CancelResult, error) {
 	out := new(CancelResult)
-	err := c.cc.Invoke(ctx, "/Exchange/Cancel", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/exchange.Exchange/Cancel", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (c *exchangeClient) Cancel(ctx context.Context, in *DealID, opts ...grpc.Ca
 }
 
 func (c *exchangeClient) Results(ctx context.Context, in *BrokerID, opts ...grpc.CallOption) (Exchange_ResultsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Exchange_ServiceDesc.Streams[1], "/Exchange/Results", opts...)
+	stream, err := c.cc.NewStream(ctx, &Exchange_ServiceDesc.Streams[1], "/exchange.Exchange/Results", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func _Exchange_Create_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Exchange/Create",
+		FullMethod: "/exchange.Exchange/Create",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ExchangeServer).Create(ctx, req.(*Deal))
@@ -203,7 +203,7 @@ func _Exchange_Cancel_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Exchange/Cancel",
+		FullMethod: "/exchange.Exchange/Cancel",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ExchangeServer).Cancel(ctx, req.(*DealID))
@@ -236,7 +236,7 @@ func (x *exchangeResultsServer) Send(m *Deal) error {
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Exchange_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "Exchange",
+	ServiceName: "exchange.Exchange",
 	HandlerType: (*ExchangeServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

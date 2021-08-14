@@ -24,7 +24,7 @@ func Init() (*zap.SugaredLogger, config.Config) {
 
 	sugar := logger.Sugar()
 
-	cfg, err := config.Load("default")
+	cfg, err := config.Load()
 	if err != nil {
 		sugar.Fatal(err)
 	}

@@ -22,7 +22,8 @@ type ExchangeService interface {
 type BrokerService interface {
 	Start()
 	Stop()
-	GetProfile(clientID int64) (Profile, error)
+	GetClient(login string) (Client, error)
+	GetProfile(login string) (Profile, error)
 	Create(deal Deal) (Deal, error)
 	Cancel(dealID int64) (bool, error)
 	History(ticker string) ([]OHLCV, error)

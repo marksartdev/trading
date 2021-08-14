@@ -51,6 +51,7 @@ func (e ExchangeService) Statistic(ctx context.Context, out chan broker.OHLCV) e
 			Time:     time.Unix(resp.GetTime(), 0),
 			Interval: time.Duration(resp.GetInterval()),
 			Open:     resp.GetOpen(),
+			High:     resp.GetHigh(),
 			Low:      resp.GetLow(),
 			Close:    resp.GetClose(),
 			Volume:   resp.GetVolume(),

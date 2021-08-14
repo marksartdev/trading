@@ -82,25 +82,43 @@ func (b *brokerService) Stop() {
 	b.logger.Error(mainAction, fmt.Errorf("cancel func dose not initialized"))
 }
 
+// GetClient returns client. Create client if it is not exist.
+func (b *brokerService) GetClient(login string) (broker.Client, error) {
+	client, ok, err := b.clientRepo.Get(login)
+	if err != nil {
+		return broker.Client{}, err
+	}
+
+	if !ok {
+		client.Login = login
+		client.Balance = 100000000
+		if err := b.clientRepo.Add(&client); err != nil {
+			return broker.Client{}, err
+		}
+	}
+
+	return client, nil
+}
+
 // GetProfile returns profile.
-func (b *brokerService) GetProfile(clientID int64) (broker.Profile, error) {
-	client, err := b.clientRepo.Get(clientID)
+func (b *brokerService) GetProfile(login string) (broker.Profile, error) {
+	client, err := b.GetClient(login)
 	if err != nil {
 		return broker.Profile{}, err
 	}
 
-	positions, err := b.posRepo.Get(clientID)
+	positions, err := b.posRepo.Get(client.ID)
 	if err != nil {
 		return broker.Profile{}, err
 	}
 
-	deals, err := b.dealRepo.GetOpened(clientID)
+	deals, err := b.dealRepo.GetOpened(client.ID)
 	if err != nil {
 		return broker.Profile{}, err
 	}
 
 	return broker.Profile{
-		ClientID:  client.ClientID,
+		ClientID:  client.ID,
 		Balance:   client.Balance,
 		Positions: positions,
 		OpenDeals: deals,

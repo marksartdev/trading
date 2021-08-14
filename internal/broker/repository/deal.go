@@ -76,10 +76,15 @@ func (d dealRepo) GetOpened(clientID int64) ([]broker.Deal, error) {
 
 // Update updates deal.
 func (d dealRepo) Update(deal broker.Deal) error {
-	return d.db.Where(Deal{ID: deal.ID}).Updates(Deal{Vol: deal.Amount, Partial: deal.Partial, Status: deal.Status}).Error
+	return d.db.Where(Deal{ID: deal.ID}).Updates(Deal{
+		Vol:     deal.Amount,
+		Partial: deal.Partial,
+		Price:   deal.Price,
+		Status:  deal.Status,
+	}).Error
 }
 
 // UpdateStatus updates deal status.
 func (d dealRepo) UpdateStatus(dealID int64, status broker.DealStatus) error {
-	return d.db.Where(Deal{ID: dealID}).Update("status", status).Error
+	return d.db.Model(Deal{}).Where(Deal{ID: dealID}).Update("status", status).Error
 }

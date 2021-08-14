@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,6 +16,7 @@ import (
 type Config struct {
 	Exchange Exchange `yaml:"exchange"`
 	Broker   Broker   `yaml:"broker"`
+	Client   Client   `yaml:"client"`
 }
 
 // Exchange stock exchange service config.
@@ -28,6 +30,11 @@ type Broker struct {
 	DB DB `yaml:"db"`
 }
 
+// Client telegram client config.
+type Client struct {
+	Token string `yaml:"token"`
+}
+
 // DB Postgres config.
 type DB struct {
 	Host     string `yaml:"host"`
@@ -39,7 +46,25 @@ type DB struct {
 }
 
 // Load loads configs from a file.
-func Load(name string) (Config, error) {
+func Load() (Config, error) {
+	base, err := load("default")
+	if err != nil {
+		return Config{}, err
+	}
+
+	rewrite, err := load("rewrite")
+	if err != nil {
+		return Config{}, err
+	}
+
+	if err := mergo.Merge(&base, rewrite); err != nil {
+		return Config{}, err
+	}
+
+	return base, nil
+}
+
+func load(name string) (Config, error) {
 	_, currentPath, _, _ := runtime.Caller(0)
 	root := strings.Split(currentPath, "trading")[0]
 	configPath := filepath.Join(root, "trading", "configs", fmt.Sprintf("%s.yaml", name))

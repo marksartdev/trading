@@ -25,3 +25,8 @@ exchange:
 broker:
 	go build -o bin/broker ./cmd/broker
 	./bin/broker
+
+.PHONY: client
+client:
+	go build -o bin/client ./cmd/client
+	./bin/client
